@@ -1,0 +1,105 @@
+def model individual_individual as
+ def import using "units_and_constants/units_BG.cellml" for
+        unit mM using unit mM;
+unit fmol using unit fmol;
+unit per_fmol using unit per_fmol;
+        unit J_per_mol using unit J_per_mol;
+unit fmol_per_sec using unit fmol_per_sec;
+        unit C_per_mol using unit C_per_mol;
+  unit J_per_C using unit J_per_C;
+        unit microm3 using unit microm3;
+  unit fF using unit fF;
+        unit fC using unit fC;
+  unit fA using unit fA;
+        unit per_second using unit per_second;
+  unit millivolt using unit millivolt;
+        unit per_sec using unit per_sec;
+  unit J_per_K_per_mol using unit J_per_K_per_mol;
+        unit fmol_per_L using unit fmol_per_L;
+  unit fmol_per_L_per_sec using unit fmol_per_L_per_sec;
+        unit per_sec_per_fmol_per_L using unit per_sec_per_fmol_per_L;
+  unit uM using unit uM;
+        unit mM_per_sec using unit mM_per_sec;
+  unit uM_per_sec using unit uM_per_sec;
+        unit pL using unit pL;
+  unit m_to_u using unit m_to_u;
+ enddef;
+def import using "units_and_constants/constants_BG.cellml" for
+            comp constants using comp constants;
+enddef;
+
+    def comp environment as
+    var time: second {pub: out};
+    // initial values
+var q_A_init: fmol {init: 1e-888};
+var q_B_init: fmol {init: 1e-888};
+var q_C_init: fmol {init: 1e-888};
+// Global value
+var q_A: fmol {pub: out};
+var q_B: fmol {pub: out};
+var q_C: fmol {pub: out};
+// From submodule
+var q_A_mindividual: fmol {pub: in};
+var q_B_mindividual: fmol {pub: in};
+var q_C_mindividual: fmol {pub: in};
+q_A = q_A_mindividual + q_A_init;
+q_B = q_B_mindividual + q_B_init;
+q_C = q_C_mindividual + q_C_init;
+enddef;
+
+def comp individual_parameters as
+var kappa_rxn: fmol_per_sec {init: 0.275946, pub: out};
+var K_A: per_fmol {init: 0.221355, pub: out};
+var K_B: per_fmol {init: 0.221355, pub: out};
+var K_C: per_fmol {init: 0.00105346, pub: out};
+enddef;
+def comp individual as
+        var time: second {pub: in};
+        var R: J_per_K_per_mol {pub: in};
+        var T: kelvin {pub: in};
+        // parameters
+var kappa_rxn: fmol_per_sec {pub: in};
+var K_A: per_fmol {pub: in};
+var K_B: per_fmol {pub: in};
+var K_C: per_fmol {pub: in};
+// Input from global environment
+var q_A_global: fmol {pub: in};
+var q_B_global: fmol {pub: in};
+var q_C_global: fmol {pub: in};
+// Output to global environment
+var q_A: fmol {init: 1e-16, pub: out};
+var q_B: fmol {init: 1e-16, pub: out};
+var q_C: fmol {init: 1e-16, pub: out};
+// Constitutive parameters
+var mu_A: J_per_mol;
+var mu_B: J_per_mol;
+var mu_C: J_per_mol;
+var v_rxn: fmol_per_sec;
+mu_A = R*T*ln(K_A*q_A_global);
+mu_B = R*T*ln(K_B*q_B_global);
+mu_C = R*T*ln(K_C*q_C_global);
+v_rxn = ppp;
+ode(q_A, time) = qqq;
+ode(q_B, time) = qqq;
+ode(q_C, time) = qqq;
+enddef;
+def map between environment and individual for
+vars time and time;
+vars q_A_mindividual and q_A;
+vars q_A and q_A_global;
+vars q_B_mindividual and q_B;
+vars q_B and q_B_global;
+vars q_C_mindividual and q_C;
+vars q_C and q_C_global;
+enddef;
+def map between individual and individual_parameters for
+vars kappa_rxn and kappa_rxn;
+vars K_A and K_A;
+vars K_B and K_B;
+vars K_C and K_C;
+enddef;
+def map between constants and individual for
+vars R and R;
+ vars T and T;
+enddef;
+enddef;

@@ -1,0 +1,116 @@
+def model BG_models as
+ def import using "units_and_constants/units_BG.cellml" for
+            unit mM using unit mM;
+unit fmol using unit fmol;
+unit per_fmol using unit per_fmol;
+            unit J_per_mol using unit J_per_mol;
+unit fmol_per_sec using unit fmol_per_sec;
+            unit C_per_mol using unit C_per_mol;
+  unit J_per_C using unit J_per_C;
+            unit microm3 using unit microm3;
+  unit fF using unit fF;
+            unit fC using unit fC;
+  unit fA using unit fA;
+            unit per_second using unit per_second;
+  unit millivolt using unit millivolt;
+            unit per_sec using unit per_sec;
+  unit J_per_K_per_mol using unit J_per_K_per_mol;
+            unit fmol_per_L using unit fmol_per_L;
+  unit fmol_per_L_per_sec using unit fmol_per_L_per_sec;
+            unit per_sec_per_fmol_per_L using unit per_sec_per_fmol_per_L;
+  unit uM using unit uM;
+            unit mM_per_sec using unit mM_per_sec;
+  unit uM_per_sec using unit uM_per_sec;
+            unit pL using unit pL;
+  unit m_to_u using unit m_to_u;
+ enddef;
+def import using "units_and_constants/constants_BG.cellml" for
+                comp constants using comp constants;
+enddef;
+
+def import using "individual/BG_individual.cellml" for
+comp individual using comp individual;
+enddef;
+
+def comp BG_parameters as
+var kappa_rxn: fmol_per_sec {init: 0.275946, pub: out};
+var K_A: per_fmol {init: 0.221355, pub: out};
+var K_B: per_fmol {init: 0.221355, pub: out};
+var K_C: per_fmol {init: 0.00105346, pub: out};
+enddef;
+    def comp environment as
+                var time: second {pub: out};
+                var vol_myo: pL {init: 34.4, pub: out};
+                var freq: dimensionless {init: 500};
+                // stimulus
+                // ramp UP and ramp DOWN
+                var stimSt: second {init: 3.5e-4};
+                var stimDur: second {init: 0.25e-4};
+                var tRamp: second {init: 1.8e-4};
+                var stimMag: fmol {init: 1e1};
+                var stimHolding: fmol {init: 1e-5};  
+                var m: fmol_per_sec;  
+                m = stimMag/tRamp;   
+                q_L_B1_init = sel          
+                    case (time < stimSt) and (time > stimSt-tRamp):   
+                        stimHolding+m*(time-stimSt+tRamp);
+                    case (time >= stimSt) and (time < stimSt+stimDur): 
+                        stimMag+stimHolding;   
+                    case (time < stimSt+tRamp+stimDur) and (time >= stimSt+stimDur):  
+                        stimHolding+-m*(time-stimSt-tRamp-stimDur);   
+                    otherwise:             
+                        stimHolding;       
+                endsel;
+var q_A_init: fmol {init: 1e-888};
+var q_B_init: fmol {init: 1e-888};
+var q_C_init: fmol {init: 1e-888};
+
+// mass conservation checks
+ var L_B1_T: fmol;
+            var R_B1_T: fmol;
+ var Gs_T: fmol;
+ var adenosine_T: fmol;
+        L_B1_T = q_L_B1+q_LR_B1Gs+q_LR_B1+q_LR_B1_aby+q_LR_B1_aby_T;
+            R_B1_T = q_R_B1+q_R_B1Gs+q_LR_B1+q_LR_B1Gs+q_R_B1_aby+q_R_B1_aby_T+q_LR_B1_aby+q_LR_B1_aby_T;
+            Gs_T = q_Gs+q_R_B1Gs+q_LR_B1Gs+q_a_Gs_GTP+q_a_Gs_GDP+q_R_B1_aby+q_R_B1_aby_T+q_LR_B1_aby+q_LR_B1_aby_T;
+            adenosine_T = q_cAMP+q_PDE_cAMP+q_five_AMP+q_ATP+q_AC_ATP+q_a_Gs_GTP_AC_ATP+q_FSK_AC_ATP;
+
+// Global value
+var q_A: fmol {pub: out};
+var q_B: fmol {pub: out};
+var q_C: fmol {pub: out};
+
+// individual imports
+var q_A_mindividual: fmol {pub: in};
+var q_B_mindividual: fmol {pub: in};
+var q_C_mindividual: fmol {pub: in};
+
+
+q_A = q_A_init + q_A_mindividual ;
+q_B = q_B_init + q_B_mindividual ;
+q_C = q_C_init + q_C_mindividual ;
+enddef;
+
+def map between environment and individual for
+vars time and time;
+vars q_A_mindividual and q_A;
+vars q_A and q_A_global;
+vars q_B_mindividual and q_B;
+vars q_B and q_B_global;
+vars q_C_mindividual and q_C;
+vars q_C and q_C_global;
+enddef;
+
+def map between BG_parameters and individual for
+vars kappa_rxn and kappa_rxn;
+vars K_A and K_A;
+vars K_B and K_B;
+vars K_C and K_C;
+enddef;
+
+def map between constants and individual for
+	vars R and R;
+	vars T and T;
+enddef;
+
+enddef;
