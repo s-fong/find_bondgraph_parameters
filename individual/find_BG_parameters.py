@@ -1,21 +1,10 @@
 # This script calculates the bond graph parameters for all reactions of the
-# a given module. 
+# a given module. Specify the directory.
+# based on SERCA model of Pan et al, which is based on Tran et al. (2009). 
 # Parameters calculated in module's directory, by using the kinetic
 # parameters and stoichiometric matrix.
-# Linear algebra routine is based on SERCA model of Pan et al, which is based on Tran et al. (2009). 
 
-# requires: data folder containing
-# all_forward_matrix.txt 
-# all_reverse_matrix.txt 
-# Kname.txt
-# rxnID.txt
-
-# writes out:
-# (1) cellml file with kinetic values, in a text file to be copied into OpenCOR TEMP.cellml.txt
-# (2) a file of only bond graph parameters in JSON format.
-
-# prints out error between given kinetic parameters, and parameters found back-transforming the bond-graph parameters
-
+# return W from kinetic_parameters
 
 import os
 import csv
@@ -24,7 +13,7 @@ import math
 import numpy as np
 import sympy
 from scipy.linalg import null_space
-
+from fractions import Fraction
 
 def read_IDs(path):
     data = []
@@ -45,33 +34,58 @@ def load_matrix(stoich_path):
         f.close()
     return matrix
 
+def rational_nullspace(A, max_denom = 10):
+    v = null_space(A)
+    vFrac = [[Fraction(num).limit_denominator(max_denominator=max_denom) for num in row] for row in v]
+
+    vRat = [] #np.zeros([len(vFrac),len(vFrac[0])])
+    if not v.any():
+        return []
+    for row in vFrac:
+        largest_denom = max([res.denominator for res in row])
+        vRat.append( [vi.numerator for vi in row] )
+    return vRat
 
 if __name__ == "__main__":
 
     ## booleans
     write_parameters_file = True
     include_constraints = True
+    include_type2_reactions = True
 
     ## Set directories
     current_dir = os.getcwd()
     data_dir = current_dir + '\data'
     output_dir = current_dir + '\output'
-    # modname = os.path.dirname(current_dir).split('\\')[-1].split('_')[-1]
-    modname = 'individual'
+    modname = os.path.dirname(current_dir).split('\\')[-1].split('BG_')[-1]
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
 
-    ## Define volumes. Populate dict V
+    if ('beta1' in current_dir) and False:
+        matstr = '_withR_LR_scheme4'
+    else:
+        matstr = ''
+
+    ## Define volumes
     V_myo = 34.4 # pL
     V = dict()
     V['V_myo'] = V_myo
 
     ## Load forward matrix
-    stoich_path = data_dir + '\\all_forward_matrix.txt'
+    if include_type2_reactions:
+        stoich_path = data_dir + '\\all_forward_matrix%s.txt'%matstr
+    else:
+        stoich_path = data_dir + '\\all_noType2_forward_matrix.txt'
+
     N_f = load_matrix(stoich_path)
 
+
     ## Load reverse matrix
-    stoich_path = data_dir + '\\all_reverse_matrix.txt'
+    if include_type2_reactions:
+        stoich_path = data_dir + '\\all_reverse_matrix%s.txt'%matstr
+    else:
+        stoich_path = data_dir + '\\all_noType2_reverse_matrix.txt'
+    
     N_r = load_matrix(stoich_path)
 
     N_fT = np.transpose(N_f)
@@ -79,7 +93,7 @@ if __name__ == "__main__":
 
     ## Calculate stoichiometric matrix
     # I matrix to align with placement of kappa down the column.
-    # x-axis of stoich matrix coincides with the kp km of that kinetic reaction
+    # x-axis of stoich matrix (R1a, R1b etc) coincides with the kp km of that kinetic reaction
     N = [[N_r[j][i] - N_f[j][i] for i in range(len(N_f[0]))] for j in range(len(N_f))]
     N_T = [[N_rT[j][i] - N_fT[j][i] for i in range(len(N_fT[0]))] for j in range(len(N_fT))]
 
@@ -94,7 +108,7 @@ if __name__ == "__main__":
     M = np.append(np.append(I, N_fT,1), np.append(I, N_rT,1),0)
 
     func = __import__('kinetic_parameters_%s'%modname)
-    [k_kinetic, N_cT, K_C, W] = func.kinetic_parameters(dims, V) 
+    [k_kinetic, N_cT, K_C, W] = func.kinetic_parameters(M, include_type2_reactions, dims, V)
     if not include_constraints:
         N_cT = []
 
@@ -114,16 +128,23 @@ if __name__ == "__main__":
     k_est = np.matmul(M,[math.log(k) for k in lambdaW])
     k_est = [math.exp(k) for k in k_est]
     diff = [(k[i] - k_est[i])/k[i] for i in range(len(k))]
+
     error = np.sum([abs(d) for d in diff])
-    Z = null_space(np.transpose(M))
+
     N_rref = sympy.Matrix(N).rref()
-    R_mat = null_space(N)
-    
+    # G = (sympy.nsimplify(sympy.Matrix(N), rational=True).nullspace()) #null_space(N)
+    R = rational_nullspace(N, max_denom=len(N[0]))
+    # Check that there is a detailed balance constraint
+    Z = null_space(M)
+
     kf = k_kinetic[:num_cols]
     kr = k_kinetic[num_cols:]
     K_eq = [kf[i]/kr[i] for i in range(len(kr))]
-    zero_est = np.matmul(np.transpose(R_mat),K_eq)
-    zero_est_log = np.matmul(np.transpose(R_mat),[math.log(k) for k in K_eq])
+    try:
+        zero_est = np.matmul(np.transpose(R),K_eq)
+        zero_est_log = np.matmul(np.transpose(R),[math.log(k) for k in K_eq])
+    except:
+        print('undefined R nullspace')
 
     # if not R_mat:
     #     warning('R_mat is empty: matrix is full rank')
@@ -147,7 +168,7 @@ if __name__ == "__main__":
     json.dump(data, file)
 
 
-    cellmlfilepath = output_dir + '\\TEMP.cellml.txt'
+    cellmlfilepath = os.getcwd() + '\\TEMP.cellml.txt'
     with open(cellmlfilepath, 'w') as cid:
         cid.write('def model individual_%s as\n def import using "units_and_constants/units_BG.cellml" for\n\
         unit mM using unit mM;\nunit fmol using unit fmol;\nunit per_fmol using unit per_fmol;\n\
