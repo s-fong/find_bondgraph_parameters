@@ -15,7 +15,8 @@ import math
 import numpy as np
 from scipy.linalg import null_space
 import sympy
-
+from sympy import Matrix, S, nsimplify
+from fractions import Fraction
 
 def read_IDs(path):
     data = []
@@ -35,6 +36,17 @@ def load_matrix(stoich_path):
         f.close()
     return matrix
 
+# def rational_nullspace(A, max_denom = 10):
+    # v = null_space(A)
+    # vFrac = [[Fraction(num).limit_denominator(max_denominator=max_denom) for num in row] for row in v]
+
+    # vRat = [] #np.zeros([len(vFrac),len(vFrac[0])])
+    # if not v.any():
+        # return []
+    # for row in vFrac:
+        # largest_denom = max([res.denominator for res in row])
+        # vRat.append( [vi.numerator for vi in row] )
+    # return vRat
 
 def calcT(I_vec,num_rows):
     num_cols = len(I_vec)
@@ -169,10 +181,15 @@ if __name__ == "__main__":
     data = { "K": K, "kappa": kappa, "k_kinetic": k_kinetic }
     json.dump(data, file)
 
-    ## Checks
+    # Checks
     N_rref = sympy.Matrix(N).rref()
-    # R_mat = sympy.Matrix(N).nullspace() #'r'
-    R_mat = null_space(N) #'r'
+    R = nsimplify(Matrix(N), rational=True).nullspace() #rational_nullspace(N, max_denom=len(N[0]))
+    if R:
+        R = np.transpose(np.array(R).astype(np.float64))[0]
+    # Check that there is a detailed balance constraint
+    Z = nsimplify(Matrix(M), rational=True).nullspace() #rational_nullspace(M, 2)
+    if Z:
+        Z = np.transpose(np.array(Z).astype(np.float64))[0]
 
     k_est = np.matmul(M,[math.log(k) for k in lambdaW])
     k_est = [math.exp(k) for k in k_est]
@@ -180,8 +197,12 @@ if __name__ == "__main__":
     error = np.sum([abs(d) for d in diff])
 
     K_eq = [kf[i]/kr[i] for i in range(len(kr))]
-    zero_est = np.matmul(np.transpose(R_mat),K_eq)
-    zero_est_log = np.matmul(np.transpose(R_mat),[math.log(k) for k in K_eq])
+    
+    try:
+        zero_est = np.matmul(np.transpose(R),K_eq)
+        zero_est_log = np.matmul(np.transpose(R),[math.log(k) for k in K_eq])
+    except:
+        print('undefined R nullspace')
 
 
     # ### print outputs ###

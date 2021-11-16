@@ -12,6 +12,7 @@ import json
 import math
 import numpy as np
 import sympy
+from sympy import Matrix, S, nsimplify
 from scipy.linalg import null_space
 from fractions import Fraction
 
@@ -34,17 +35,22 @@ def load_matrix(stoich_path):
         f.close()
     return matrix
 
-def rational_nullspace(A, max_denom = 10):
-    v = null_space(A)
-    vFrac = [[Fraction(num).limit_denominator(max_denominator=max_denom) for num in row] for row in v]
-
-    vRat = [] #np.zeros([len(vFrac),len(vFrac[0])])
-    if not v.any():
-        return []
-    for row in vFrac:
-        largest_denom = max([res.denominator for res in row])
-        vRat.append( [vi.numerator for vi in row] )
-    return vRat
+# def rational_nullspace(A, max_denom = 10):
+#     v = null_space(A)
+#     vFrac = [[Fraction(num).limit_denominator(max_denominator=max_denom) for num in row] for row in v]
+#
+#     vRat = [] #np.zeros([len(vFrac),len(vFrac[0])])
+#     if not v.any():
+#         return []
+#     all_denom = [[res.denominator for res in row] for row in vFrac]
+#     if all_denom.count(all_denom[0]) == len(all_denom):# identical
+#         for row in vFrac:
+#             largest_denom = max([res.denominator for res in row])
+#             vRat.append( [vi.numerator for vi in row] )
+#         return vRat
+#     else:
+#         print('denominators for fractions of rational nullspace are not identical')
+#         return []
 
 if __name__ == "__main__":
 
@@ -131,11 +137,15 @@ if __name__ == "__main__":
 
     error = np.sum([abs(d) for d in diff])
 
+    # Checks
     N_rref = sympy.Matrix(N).rref()
-    # G = (sympy.nsimplify(sympy.Matrix(N), rational=True).nullspace()) #null_space(N)
-    R = rational_nullspace(N, max_denom=len(N[0]))
+    R = nsimplify(Matrix(N), rational=True).nullspace() #rational_nullspace(N, max_denom=len(N[0]))
+    if R:
+        R = np.transpose(np.array(R).astype(np.float64))[0]
     # Check that there is a detailed balance constraint
-    Z = null_space(M)
+    Z = nsimplify(Matrix(M), rational=True).nullspace() #rational_nullspace(M, 2)
+    if Z:
+        Z = np.transpose(np.array(Z).astype(np.float64))[0]
 
     kf = k_kinetic[:num_cols]
     kr = k_kinetic[num_cols:]
